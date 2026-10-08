@@ -209,11 +209,12 @@ final List<String> defaultAnimeTags = const [
 
 // 播放器默认快捷键
 final Map<String, List<String>> defaultShortcuts = const {
-  'playorpause': [' '],
-  'forward': ['Arrow Right'],
-  'rewind': ['Arrow Left'],
-  'next': ['N'],
-  'prev': ['P'],
+  // 电视遥控器：确认键 / 播放暂停键 / 快进快退键 / 频道加减
+  'playorpause': [' ', 'Select', 'Enter', 'Media Play Pause'],
+  'forward': ['Arrow Right', 'Media Fast Forward'],
+  'rewind': ['Arrow Left', 'Media Rewind'],
+  'next': ['N', 'Media Track Next', 'Channel Up'],
+  'prev': ['P', 'Media Track Previous', 'Channel Down'],
   'volumeup': ['Arrow Up'],
   'volumedown': ['Arrow Down'],
   'togglemute': ['M'],

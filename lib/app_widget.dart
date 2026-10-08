@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
+import 'package:kazumi/bean/widget/tv_focus_overlay.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:kazumi/services/logging/logger.dart';
@@ -315,6 +316,9 @@ class _AppWidgetState extends State<AppWidget>
           themeMode: themeProvider.themeMode,
           scaffoldMessengerKey: rootScaffoldMessengerKey,
           routerConfig: ModularApp.routerConfigOf(context),
+          // 遥控器方向键移动焦点时画高亮框（电视端适配）
+          builder: (context, child) =>
+              TvFocusOverlay(child: child ?? const SizedBox.shrink()),
         );
       },
     );
