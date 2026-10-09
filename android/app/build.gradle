@@ -27,7 +27,7 @@ android {
     compileSdk flutter.compileSdkVersion
     // Use the highest NDK required by the native plugins. Newer NDKs remain
     // backward compatible with plugins that declare an older version.
-    ndkVersion "28.2.13676358"
+    ndkVersion "30.0.16248370"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
