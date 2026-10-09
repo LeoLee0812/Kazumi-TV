@@ -130,12 +130,16 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
       var input = '';
       return AlertDialog(
         title: const Text('图片链接'),
-        content: TextField(
-          autofocus: true,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(hintText: 'https://'),
-          onChanged: (value) => input = value,
-          onSubmitted: (value) => KazumiDialog.dismiss(popWith: value.trim()),
+        content: SizedBox(
+          width: 480,
+          child: TextField(
+            autofocus: true,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(hintText: 'https://'),
+            onChanged: (value) => input = value,
+            onSubmitted: (value) =>
+                KazumiDialog.dismiss(popWith: value.trim()),
+          ),
         ),
         actions: [
           TextButton(
