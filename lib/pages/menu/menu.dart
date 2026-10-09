@@ -7,7 +7,7 @@ import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/settings/theme_provider.dart';
 import 'package:kazumi/bean/widget/embedded_native_control_area.dart';
 import 'package:kazumi/navigation.dart';
-import 'package:kazumi/pages/menu/menu_focus_bridge.dart';
+import 'package:kazumi/bean/widget/menu_focus_bridge.dart';
 import 'package:kazumi/pages/menu/route_visibility.dart';
 import 'package:kazumi/pages/router.dart';
 
@@ -74,6 +74,7 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
     }
     final outlet = _outletKey.currentState;
     if (outlet == null) return;
+    _focusBridge.keepMenuFocus();
     outlet.navigate('/tab${menu.getPath(index)}/');
     setState(() => _selectedIndex = index);
   }

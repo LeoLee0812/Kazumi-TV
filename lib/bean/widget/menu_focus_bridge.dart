@@ -26,6 +26,23 @@ class MenuFocusBridge {
     contentNode.dispose();
   }
 
+  /// 在导航栏上按确认切换页面前调用。新路由入栈时会把焦点抢进自己的 FocusScope，
+  /// 这里等它抢完再把焦点还给刚才按下的导航项，否则接着按上下键就跑到页面里去了。
+  void keepMenuFocus() {
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus == null || !focus.ancestors.contains(menuNode)) return;
+    var remainingFrames = 3;
+    void restore(Duration _) {
+      if (focus.context == null || !focus.canRequestFocus) return;
+      if (!focus.hasPrimaryFocus) focus.requestFocus();
+      if (--remainingFrames > 0) {
+        WidgetsBinding.instance.addPostFrameCallback(restore);
+      }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback(restore);
+  }
+
   static TraversalDirection? _directionOf(KeyEvent event) {
     if (event is KeyUpEvent) return null;
     final key = event.logicalKey;
@@ -42,13 +59,28 @@ class MenuFocusBridge {
     return node.canRequestFocus && rect.isFinite && !rect.isEmpty;
   }
 
-  /// 内容区的按键处理：[toMenu] 方向上已经没有可去的控件时，把焦点交给导航栏里
-  /// 第 [selectedIndex] 个目的地。
+  static FocusNode? _nearest(Iterable<FocusNode> nodes, Offset origin) {
+    FocusNode? nearest;
+    var nearestDistance = double.infinity;
+    for (final node in nodes) {
+      final distance = (node.rect.center - origin).distanceSquared;
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = node;
+      }
+    }
+    return nearest;
+  }
+
+  /// 内容区的按键处理：[toMenu] 方向上已经没有可去的控件时，把焦点交给导航栏。
+  ///
+  /// 给了 [selectedIndex] 和 [destinationCount] 就落到当前选中的目的地上，
+  /// 否则落到离当前焦点最近的那一项。
   KeyEventResult handleContentKey(
     KeyEvent event, {
     required TraversalDirection toMenu,
-    required int selectedIndex,
-    required int destinationCount,
+    int? selectedIndex,
+    int? destinationCount,
   }) {
     if (_directionOf(event) != toMenu) return KeyEventResult.ignored;
     final focus = FocusManager.instance.primaryFocus;
@@ -61,22 +93,29 @@ class MenuFocusBridge {
     }
     if (focus.focusInDirection(toMenu)) return KeyEventResult.handled;
 
-    final horizontal =
-        toMenu == TraversalDirection.left || toMenu == TraversalDirection.right;
-    final targets = menuNode.traversalDescendants.where(_isUsable).toList()
-      ..sort(
+    final targets = menuNode.traversalDescendants.where(_isUsable).toList();
+    if (targets.isEmpty) return KeyEventResult.ignored;
+    final FocusNode target;
+    if (selectedIndex != null && destinationCount != null) {
+      final horizontal =
+          toMenu == TraversalDirection.left ||
+          toMenu == TraversalDirection.right;
+      targets.sort(
         (a, b) => horizontal
             ? a.rect.top.compareTo(b.rect.top)
             : a.rect.left.compareTo(b.rect.left),
       );
-    if (targets.isEmpty) return KeyEventResult.ignored;
-    // 目的地排在最后（侧边栏顶部还有一个搜索按钮）
-    final index = (targets.length - destinationCount + selectedIndex).clamp(
-      0,
-      targets.length - 1,
-    );
+      // 目的地排在最后（侧边栏顶部还有一个搜索按钮）
+      target =
+          targets[(targets.length - destinationCount + selectedIndex).clamp(
+            0,
+            targets.length - 1,
+          )];
+    } else {
+      target = _nearest(targets, focus.rect.center)!;
+    }
     _lastContentFocus = focus;
-    targets[index].requestFocus();
+    target.requestFocus();
     return KeyEventResult.handled;
   }
 
@@ -98,17 +137,10 @@ class MenuFocusBridge {
       return KeyEventResult.handled;
     }
 
-    final origin = focus.rect.center;
-    FocusNode? nearest;
-    var nearestDistance = double.infinity;
-    for (final node in contentNode.traversalDescendants) {
-      if (!_isUsable(node)) continue;
-      final distance = (node.rect.center - origin).distanceSquared;
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearest = node;
-      }
-    }
+    final nearest = _nearest(
+      contentNode.traversalDescendants.where(_isUsable),
+      focus.rect.center,
+    );
     if (nearest == null) return KeyEventResult.ignored;
     nearest.requestFocus();
     return KeyEventResult.handled;

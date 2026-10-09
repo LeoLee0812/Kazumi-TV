@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kazumi/pages/menu/menu_focus_bridge.dart';
+import 'package:kazumi/bean/widget/menu_focus_bridge.dart';
 
 void main() {
   late MenuFocusBridge bridge;
@@ -121,6 +121,19 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pump();
     expect(contentNodes[0].hasPrimaryFocus, isTrue);
+  });
+
+  testWidgets('在导航栏上切换页面后，焦点留在导航栏', (tester) async {
+    await pumpShell(tester, selectedIndex: 0);
+    menuNodes[2].requestFocus();
+    await tester.pump();
+
+    bridge.keepMenuFocus();
+    // 模拟新页面入栈后把焦点抢走
+    contentNodes[0].requestFocus();
+    await tester.pump();
+    await tester.pump();
+    expect(menuNodes[2].hasPrimaryFocus, isTrue);
   });
 
   testWidgets('输入框里的左键留给光标，不抢焦点', (tester) async {
