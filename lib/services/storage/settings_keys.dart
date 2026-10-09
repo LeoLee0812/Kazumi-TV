@@ -557,6 +557,17 @@ class SettingsKeys {
     false,
     group: SettingGroup.player,
   );
+  // 主界面背景图：图片在应用数据目录内的路径（空串表示不使用）和不透明度
+  static const backgroundImagePath = SettingKey<String>(
+    'backgroundImagePath',
+    '',
+    group: SettingGroup.theme,
+  );
+  static const backgroundImageOpacity = SettingKey<double>(
+    'backgroundImageOpacity',
+    0.3,
+    group: SettingGroup.theme,
+  );
 
   static final List<SettingKey<Object?>> all = [
     hAenable,
@@ -661,6 +672,8 @@ class SettingsKeys {
     playerControllerLayerDisappearTime,
     defaultVolume,
     playerMuted,
+    backgroundImagePath,
+    backgroundImageOpacity,
   ];
 
   static List<SettingKey<Object?>> byGroup(SettingGroup group) {

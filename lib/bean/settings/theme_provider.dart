@@ -9,6 +9,10 @@ class ThemeProvider extends ChangeNotifier {
   late ThemeData dark;
   String? currentFontFamily = customAppFontFamily;
 
+  /// 主界面背景图的本地路径，空串表示不使用
+  String backgroundImagePath = '';
+  double backgroundImageOpacity = 0.3;
+
   /// Returns true if the effective theme is dark mode.
   /// Automatically gets platform brightness when themeMode is ThemeMode.system.
   bool isEffectiveDark() {
@@ -37,6 +41,16 @@ class ThemeProvider extends ChangeNotifier {
 
   void setFontFamily(bool useSystemFont, {bool notify = true}) {
     currentFontFamily = useSystemFont ? null : customAppFontFamily;
+    if (notify) notifyListeners();
+  }
+
+  void setBackgroundImage(String path, {bool notify = true}) {
+    backgroundImagePath = path;
+    if (notify) notifyListeners();
+  }
+
+  void setBackgroundImageOpacity(double opacity, {bool notify = true}) {
+    backgroundImageOpacity = opacity.clamp(0.0, 1.0);
     if (notify) notifyListeners();
   }
 }

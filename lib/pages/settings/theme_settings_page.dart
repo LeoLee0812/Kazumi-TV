@@ -1,6 +1,12 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:kazumi/request/core/dio_factory.dart';
+import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/bean/card/palette_card.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/services/storage/storage.dart';
@@ -28,6 +34,9 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
   late bool useDynamicColor;
   late bool showWindowButton;
   late bool useSystemFont;
+  late String backgroundImagePath;
+  late double backgroundImageOpacity;
+  bool _savingBackgroundImage = false;
   late final ThemeProvider themeProvider;
 
   @override
@@ -40,6 +49,140 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     showWindowButton = GStorage.getSetting(SettingsKeys.showWindowButton);
     useSystemFont = GStorage.getSetting(SettingsKeys.useSystemFont);
     themeProvider = context.read<ThemeProvider>();
+    backgroundImagePath = themeProvider.backgroundImagePath;
+    backgroundImageOpacity = themeProvider.backgroundImageOpacity;
+  }
+
+  static const _backgroundImageExtensions = [
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+    'gif',
+    'bmp',
+  ];
+
+  /// 把图片存进应用数据目录再启用，避免原文件被移动或删除后背景丢失。
+  Future<void> _saveBackgroundImage(List<int> bytes, String extension) async {
+    final supportDir = await getApplicationSupportDirectory();
+    final dir = Directory(path.join(supportDir.path, 'background'));
+    await dir.create(recursive: true);
+    // 文件名带时间戳，换图后不会命中旧图的图片缓存
+    final file = File(path.join(
+      dir.path,
+      'background_${DateTime.now().millisecondsSinceEpoch}.$extension',
+    ));
+    await file.writeAsBytes(bytes, flush: true);
+    final oldPath = backgroundImagePath;
+    await GStorage.putSetting(SettingsKeys.backgroundImagePath, file.path);
+    themeProvider.setBackgroundImage(file.path);
+    if (mounted) setState(() => backgroundImagePath = file.path);
+    await _deleteBackgroundFile(oldPath);
+  }
+
+  Future<void> _deleteBackgroundFile(String filePath) async {
+    if (filePath.isEmpty) return;
+    try {
+      final file = File(filePath);
+      if (await file.exists()) await file.delete();
+    } on FileSystemException {
+      // 旧图删不掉不影响使用
+    }
+  }
+
+  static String _imageExtensionOf(String name) {
+    final extension = path.extension(name).replaceFirst('.', '').toLowerCase();
+    return _backgroundImageExtensions.contains(extension) ? extension : 'jpg';
+  }
+
+  Future<void> _runBackgroundImageTask(Future<void> Function() task) async {
+    if (_savingBackgroundImage) return;
+    setState(() => _savingBackgroundImage = true);
+    try {
+      await task();
+    } catch (error, stackTrace) {
+      KazumiLogger().e('Theme: failed to set background image',
+          error: error, stackTrace: stackTrace);
+      KazumiDialog.showToast(message: '设置背景图失败：$error');
+    } finally {
+      if (mounted) setState(() => _savingBackgroundImage = false);
+    }
+  }
+
+  Future<void> _pickBackgroundImage() => _runBackgroundImageTask(() async {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: _backgroundImageExtensions,
+          withData: true,
+        );
+        if (result == null) return;
+        final picked = result.files.single;
+        final bytes = picked.bytes ??
+            (picked.path == null
+                ? null
+                : await File(picked.path!).readAsBytes());
+        if (bytes == null) throw const FileSystemException('无法读取所选图片');
+        await _saveBackgroundImage(bytes, _imageExtensionOf(picked.name));
+      });
+
+  Future<void> _downloadBackgroundImage() async {
+    final url = await KazumiDialog.show<String>(builder: (context) {
+      var input = '';
+      return AlertDialog(
+        title: const Text('图片链接'),
+        content: TextField(
+          autofocus: true,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(hintText: 'https://'),
+          onChanged: (value) => input = value,
+          onSubmitted: (value) => KazumiDialog.dismiss(popWith: value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => KazumiDialog.dismiss(),
+            child: Text(
+              '取消',
+              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+            ),
+          ),
+          TextButton(
+            onPressed: () => KazumiDialog.dismiss(popWith: input.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      );
+    });
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme || !uri.scheme.startsWith('http')) {
+      KazumiDialog.showToast(message: '请输入 http 或 https 开头的图片链接');
+      return;
+    }
+    await _runBackgroundImageTask(() async {
+      final response = await DioFactory.downloadDio.getUri<List<int>>(
+        uri,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final bytes = response.data;
+      if (bytes == null || bytes.isEmpty) {
+        throw const FileSystemException('图片内容为空');
+      }
+      await _saveBackgroundImage(bytes, _imageExtensionOf(uri.path));
+    });
+  }
+
+  Future<void> _clearBackgroundImage() async {
+    final oldPath = backgroundImagePath;
+    await GStorage.putSetting(SettingsKeys.backgroundImagePath, '');
+    themeProvider.setBackgroundImage('');
+    setState(() => backgroundImagePath = '');
+    await _deleteBackgroundFile(oldPath);
+  }
+
+  void _updateBackgroundImageOpacity(double value) {
+    themeProvider.setBackgroundImageOpacity(value);
+    setState(() => backgroundImageOpacity = value);
+    GStorage.putSetting(SettingsKeys.backgroundImageOpacity, value);
   }
 
   void setTheme(Color? color) {
@@ -229,6 +372,42 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
               ),
             ],
             bottomInfo: Text('动态配色仅支持安卓12及以上和桌面平台'),
+          ),
+          SettingsSection(
+            title: const Text('背景图'),
+            tiles: [
+              SettingsTile(
+                leading: Icons.image_rounded,
+                enabled: !_savingBackgroundImage,
+                onPressed: (_) => _pickBackgroundImage(),
+                title: const Text('选择本地图片'),
+                value: Text(backgroundImagePath.isEmpty ? '未设置' : '已设置'),
+              ),
+              SettingsTile(
+                leading: Icons.link_rounded,
+                enabled: !_savingBackgroundImage,
+                onPressed: (_) => _downloadBackgroundImage(),
+                title: const Text('从图片链接下载'),
+              ),
+              if (backgroundImagePath.isNotEmpty) ...[
+                SettingsSliderTile(
+                  leading: Icons.opacity_rounded,
+                  title: const Text('背景图不透明度'),
+                  value: backgroundImageOpacity,
+                  valueLabel: '${(backgroundImageOpacity * 100).round()}%',
+                  min: 0.05,
+                  max: 1,
+                  divisions: 19,
+                  onChanged: _updateBackgroundImageOpacity,
+                ),
+                SettingsTile(
+                  leading: Icons.hide_image_rounded,
+                  onPressed: (_) => _clearBackgroundImage(),
+                  title: const Text('移除背景图'),
+                ),
+              ],
+            ],
+            bottomInfo: const Text('背景图显示在推荐、时间表、追番和我的这几个主界面'),
           ),
           SettingsSection(
             title: Text('显示'),

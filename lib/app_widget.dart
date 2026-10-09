@@ -101,6 +101,14 @@ class _AppWidgetState extends State<AppWidget>
       GStorage.getSetting(SettingsKeys.useSystemFont),
       notify: false,
     );
+    themeProvider.setBackgroundImage(
+      GStorage.getSetting(SettingsKeys.backgroundImagePath),
+      notify: false,
+    );
+    themeProvider.setBackgroundImageOpacity(
+      GStorage.getSetting(SettingsKeys.backgroundImageOpacity),
+      notify: false,
+    );
 
     final color = _storedThemeColor();
     final oledEnhance = GStorage.getSetting(SettingsKeys.oledEnhance);

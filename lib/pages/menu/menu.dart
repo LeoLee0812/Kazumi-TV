@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
+import 'package:kazumi/bean/settings/theme_provider.dart';
 import 'package:kazumi/bean/widget/embedded_native_control_area.dart';
 import 'package:kazumi/navigation.dart';
 import 'package:kazumi/pages/menu/menu_focus_bridge.dart';
@@ -101,6 +104,7 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
+    final background = _backgroundImage(context);
     return RouteVisibility(
       isCovered: _isCovered,
       child: PopScope(
@@ -112,18 +116,57 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
         },
         child: OrientationBuilder(
           builder: (context, orientation) {
-            return orientation == Orientation.portrait
-                ? _bottomMenu(context, _selectedIndex)
-                : _sideMenu(context, _selectedIndex);
+            final shell = orientation == Orientation.portrait
+                ? _bottomMenu(context, _selectedIndex, background != null)
+                : _sideMenu(context, _selectedIndex, background != null);
+            if (background == null) return shell;
+            return ColoredBox(
+              color: Theme.of(context).colorScheme.surfaceContainer,
+              child: Stack(fit: StackFit.expand, children: [background, shell]),
+            );
           },
         ),
       ),
     );
   }
 
+  /// 用户设置的主界面背景图；没设置或文件已不存在时返回 null。
+  Widget? _backgroundImage(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
+    final path = themeProvider.backgroundImagePath;
+    if (path.isEmpty) return null;
+    final file = File(path);
+    if (!file.existsSync()) return null;
+    return Opacity(
+      opacity: themeProvider.backgroundImageOpacity,
+      child: Image.file(
+        file,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        excludeFromSemantics: true,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+      ),
+    );
+  }
+
+  /// 有背景图时让各标签页的底色透明，把背景图露出来。
+  Widget _seeThrough(BuildContext context, Widget child) {
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        scaffoldBackgroundColor: Colors.transparent,
+        appBarTheme: theme.appBarTheme.copyWith(
+          backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.6),
+        ),
+      ),
+      child: child,
+    );
+  }
+
   Widget _outlet(
     BuildContext context, {
     required TraversalDirection toMenu,
+    required bool hasBackground,
     BorderRadius? borderRadius,
   }) {
     Widget child = NotificationListener<NavigationNotification>(
@@ -131,6 +174,9 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
       onNotification: (notification) => !notification.canHandlePop,
       child: RouterOutlet(key: _outletKey),
     );
+    if (hasBackground) {
+      child = _seeThrough(context, child);
+    }
     if (borderRadius != null) {
       child = ClipRRect(borderRadius: borderRadius, child: child);
     }
@@ -144,7 +190,9 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer,
+          color: hasBackground
+              ? Colors.transparent
+              : Theme.of(context).colorScheme.primaryContainer,
           borderRadius: borderRadius,
         ),
         child: child,
@@ -161,9 +209,18 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
     );
   }
 
-  Widget _bottomMenu(BuildContext context, int selectedIndex) {
+  Widget _bottomMenu(
+    BuildContext context,
+    int selectedIndex,
+    bool hasBackground,
+  ) {
     return Scaffold(
-      body: _outlet(context, toMenu: TraversalDirection.down),
+      backgroundColor: hasBackground ? Colors.transparent : null,
+      body: _outlet(
+        context,
+        toMenu: TraversalDirection.down,
+        hasBackground: hasBackground,
+      ),
       bottomNavigationBar: _menuFocus(
         TraversalDirection.up,
         NavigationBar(
@@ -196,20 +253,27 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
     );
   }
 
-  Widget _sideMenu(BuildContext context, int selectedIndex) {
+  Widget _sideMenu(
+    BuildContext context,
+    int selectedIndex,
+    bool hasBackground,
+  ) {
     const borderRadius = BorderRadius.only(
       topLeft: Radius.circular(16),
       bottomLeft: Radius.circular(16),
     );
+    final shellColor = hasBackground
+        ? Colors.transparent
+        : Theme.of(context).colorScheme.surfaceContainer;
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+      backgroundColor: shellColor,
       body: Row(
         children: [
           EmbeddedNativeControlArea(
             child: _menuFocus(
               TraversalDirection.right,
               NavigationRail(
-                backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                backgroundColor: shellColor,
                 groupAlignment: 1,
                 leading: FloatingActionButton(
                   elevation: 0,
@@ -249,6 +313,7 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
             child: _outlet(
               context,
               toMenu: TraversalDirection.left,
+              hasBackground: hasBackground,
               borderRadius: borderRadius,
             ),
           ),

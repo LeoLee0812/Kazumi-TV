@@ -166,7 +166,8 @@ class _PopularPageState extends State<PopularPage> {
       elevation: 0,
       titleSpacing: 0,
       centerTitle: false,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor:
+          theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
       actions: buildActions(),
       title: null,
       flexibleSpace: SafeArea(
