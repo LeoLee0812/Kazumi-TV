@@ -161,7 +161,8 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
                             ...colorThemes.map(
                               (e) {
                                 final index = colorThemes.indexOf(e);
-                                return GestureDetector(
+                                return InkWell(
+                                  borderRadius: BorderRadius.circular(12),
                                   onTap: () {
                                     index == 0
                                         ? resetTheme()
